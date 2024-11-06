@@ -1,0 +1,10 @@
+langchain_google_genai
+streamlit
+ipykernel
+python-dotenv
+langchain_core
+langchain
+langchain_community
+langchain_groq
+langchain_aws
+langchain_ollama
