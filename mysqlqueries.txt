@@ -1,0 +1,136 @@
+  CREATE TABLE shop (
+      article INT UNSIGNED  DEFAULT '0000' NOT NULL,
+      dealer  CHAR(20)      DEFAULT ''     NOT NULL,
+      price   DECIMAL(16,2) DEFAULT '0.00' NOT NULL,
+      PRIMARY KEY(article, dealer));
+  INSERT INTO shop VALUES
+      (1,'A',3.45),(1,'B',3.99),(2,'A',10.99),(3,'B',1.45),
+      (3,'C',1.69),(3,'D',1.25),(4,'D',19.95);
+  SELECT * FROM shop ORDER BY article;
+  
+  SELECT article, dealer, price
+  FROM   shop
+  WHERE  price=(SELECT MAX(price) FROM shop);
+  SELECT s1.article, s1.dealer, s1.price
+  FROM shop s1
+  LEFT JOIN shop s2 ON s1.price < s2.price
+  WHERE s2.article IS NULL;
+
+-- Assuming we have an additional `sales` table that tracks sales information
+CREATE TABLE sales (
+    sale_id INT PRIMARY KEY AUTO_INCREMENT,
+    article INT UNSIGNED,
+    dealer CHAR(20),
+    sale_price DECIMAL(16, 2),
+    sale_date DATE,
+    FOREIGN KEY (article, dealer) REFERENCES shop(article, dealer)
+);
+
+-- Insert sample data into `sales`
+INSERT INTO sales (article, dealer, sale_price, sale_date) VALUES
+    (1, 'A', 3.50, '2024-01-01'),
+    (1, 'B', 4.00, '2024-01-02'),
+    (2, 'A', 11.00, '2024-01-03'),
+    (3, 'B', 1.50, '2024-01-04'),
+    (3, 'C', 1.80, '2024-01-05'),
+    (4, 'D', 20.00, '2024-01-06');
+
+-- Complex Query
+SELECT s.dealer, s.article, s.sale_price
+FROM sales s
+WHERE s.sale_price > (
+    SELECT AVG(price) 
+    FROM shop 
+    WHERE article = s.article
+)
+ORDER BY s.article, s.dealer;
+
+
+CREATE TABLE customers (
+    customer_id INT PRIMARY KEY AUTO_INCREMENT,
+    customer_name VARCHAR(100),
+    contact_info VARCHAR(100)
+);
+
+CREATE TABLE payments (
+    payment_id INT PRIMARY KEY AUTO_INCREMENT,
+    customer_id INT,
+    sale_id INT,
+    payment_amount DECIMAL(16, 2),
+    payment_date DATE,
+    FOREIGN KEY (customer_id) REFERENCES customers(customer_id),
+    FOREIGN KEY (sale_id) REFERENCES sales(sale_id)
+);
+
+INSERT INTO customers (customer_name, contact_info) VALUES
+    ('Alice Johnson', 'alice@example.com'),
+    ('Bob Smith', 'bob@example.com'),
+    ('Charlie Brown', 'charlie@example.com');
+
+INSERT INTO payments (customer_id, sale_id, payment_amount, payment_date) VALUES
+    (1, 1, 3.50, '2024-01-02'),
+    (2, 2, 4.00, '2024-01-03'),
+    (1, 3, 11.00, '2024-01-04'),
+    (3, 4, 1.50, '2024-01-05'),
+    (2, 5, 20.00, '2024-01-06');
+
+
+SELECT 
+    s.dealer,
+    s.article,
+    SUM(s.sale_price) AS total_sales,
+    AVG(s.sale_price) AS avg_sale_price,
+    SUM(p.payment_amount) AS total_payments,
+    RANK() OVER (ORDER BY SUM(s.sale_price) DESC) AS sales_rank
+FROM 
+    sales s
+JOIN 
+    payments p ON s.sale_id = p.sale_id
+WHERE 
+    s.sale_price > (
+        SELECT AVG(price) 
+        FROM shop 
+        WHERE article = s.article
+    )
+GROUP BY 
+    s.dealer, s.article
+HAVING 
+    total_payments > 0
+ORDER BY 
+    total_sales DESC;
+
+select * from sales;
+
+UPDATE sales AS s
+JOIN (
+    SELECT article, AVG(price) AS avg_price
+    FROM shop
+    GROUP BY article
+) AS avg_shop ON s.article = avg_shop.article
+SET s.sale_price = avg_shop.avg_price
+WHERE s.sale_price < avg_shop.avg_price;
+
+select * from sales;
+
+select * from shop;
+
+UPDATE shop AS sh
+JOIN (
+    SELECT article, dealer, MAX(sale_price) AS max_sale_price
+    FROM sales
+    GROUP BY article, dealer
+) AS max_sales ON sh.article = max_sales.article AND sh.dealer = max_sales.dealer
+SET sh.price = max_sales.max_sale_price;
+
+select * from shop;
+
+DELETE s
+FROM sales AS s
+LEFT JOIN shop AS sh ON s.article = sh.article AND s.dealer = sh.dealer
+WHERE sh.article IS NULL;
+
+DELETE c
+FROM customers AS c
+LEFT JOIN payments AS p ON c.customer_id = p.customer_id
+WHERE p.payment_id IS NULL;
+
